@@ -2,11 +2,15 @@
  * Arduino PID Library - Version 1.2.1
  * by Brett Beauregard <br3ttb@gmail.com> brettbeauregard.com
  *
- * This Library is licensed under the MIT License
+ * Adapted for Particle by Dan Rice <dan@zoombody.com>
+ *
+ * This Library is licensed under a GPLv3 License
  **********************************************************************************************/
 
 #if ARDUINO >= 100
 #include "Arduino.h"
+#elif defined(SPARK)
+#include "application.h"
 #else
 #include "WProgram.h"
 #endif
@@ -18,7 +22,7 @@
  *    reliable defaults, so we need to have the user set them.
  ***************************************************************************/
 PID::PID(double *Input, double *Output, double *Setpoint,
-         double Kp, double Ki, double Kd, int POn, int ControllerDirection)
+         double Kp, double Ki, double Kd, action_t POn, direction_t ControllerDirection)
 {
     myOutput = Output;
     myInput = Input;
@@ -31,7 +35,8 @@ PID::PID(double *Input, double *Output, double *Setpoint,
     SampleTime = 100; //default Controller Sample Time is 0.1 seconds
 
     PID::SetControllerDirection(ControllerDirection);
-    PID::SetTunings(Kp, Ki, Kd, POn);
+    PID::SetTunings(Kp, Ki, Kd);
+    PID::SetAction(POn);
 
     lastTime = millis() - SampleTime;
 }
@@ -42,7 +47,7 @@ PID::PID(double *Input, double *Output, double *Setpoint,
  ***************************************************************************/
 
 PID::PID(double *Input, double *Output, double *Setpoint,
-         double Kp, double Ki, double Kd, int ControllerDirection)
+         double Kp, double Ki, double Kd, direction_t ControllerDirection)
     : PID::PID(Input, Output, Setpoint, Kp, Ki, Kd, P_ON_E, ControllerDirection)
 {
 }
@@ -106,13 +111,10 @@ bool PID::Compute()
  * it's called automatically from the constructor, but tunings can also
  * be adjusted on the fly during normal operation
  ******************************************************************************/
-void PID::SetTunings(double Kp, double Ki, double Kd, int POn)
+void PID::SetTunings(double Kp, double Ki, double Kd)
 {
     if (Kp < 0 || Ki < 0 || Kd < 0)
         return;
-
-    pOn = POn;
-    pOnE = POn == P_ON_E;
 
     dispKp = Kp;
     dispKi = Ki;
@@ -131,12 +133,13 @@ void PID::SetTunings(double Kp, double Ki, double Kd, int POn)
     }
 }
 
-/* SetTunings(...)*************************************************************
- * Set Tunings using the last-rembered POn setting
+/* SetAction(...)*************************************************************
+ * Set PID Action P on Error or P on Measurement
  ******************************************************************************/
-void PID::SetTunings(double Kp, double Ki, double Kd)
+void PID::SetAction(action_t POn)
 {
-    SetTunings(Kp, Ki, Kd, pOn);
+    pOn = POn;
+    pOnE = POn == P_ON_E;
 }
 
 /* SetSampleTime(...) *********************************************************
@@ -187,7 +190,7 @@ void PID::SetOutputLimits(double Min, double Max)
  * when the transition from manual to auto occurs, the controller is
  * automatically initialized
  ******************************************************************************/
-void PID::SetMode(int Mode)
+void PID::SetMode(mode_t Mode)
 {
     bool newAuto = (Mode == AUTOMATIC);
     if (newAuto && !inAuto)
@@ -217,7 +220,7 @@ void PID::Initialize()
  * know which one, because otherwise we may increase the output when we should
  * be decreasing.  This is called from the constructor.
  ******************************************************************************/
-void PID::SetControllerDirection(int Direction)
+void PID::SetControllerDirection(direction_t Direction)
 {
     if (inAuto && Direction != controllerDirection)
     {
@@ -236,5 +239,6 @@ void PID::SetControllerDirection(int Direction)
 double PID::GetKp() { return dispKp; }
 double PID::GetKi() { return dispKi; }
 double PID::GetKd() { return dispKd; }
-int PID::GetMode() { return inAuto ? AUTOMATIC : MANUAL; }
-int PID::GetDirection() { return controllerDirection; }
+PID::mode_t PID::GetMode() { return inAuto ? AUTOMATIC : MANUAL; }
+PID::direction_t PID::GetDirection() { return controllerDirection; }
+PID::action_t PID::GetAction() { return pOn; }
